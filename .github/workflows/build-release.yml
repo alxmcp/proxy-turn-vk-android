@@ -152,7 +152,7 @@ jobs:
           echo "Server asset:"
           ls -lh app/src/main/assets/${SERVER_BINARY_NAME}
 
-      - name: Build Android Go client libraries
+      - name: Build Android Go client binaries
         shell: bash
         run: |
           set -euo pipefail
@@ -176,16 +176,15 @@ jobs:
           cd go_client
 
           echo "== Build libclient.so for arm64-v8a =="
-          CGO_ENABLED=1 \
+          CGO_ENABLED=0 \
           GOOS=android \
           GOARCH=arm64 \
-          CC="$TOOLCHAIN/aarch64-linux-android${ANDROID_MIN_API}-clang" \
             go build \
-              -buildmode=c-shared \
               -trimpath \
-              -ldflags="-s -w -checklinkname=0" \
+              -ldflags="-checklinkname=0 -s -w" \
               -o ../app/src/main/jniLibs/arm64-v8a/libclient.so \
               .
+          chmod +x ../app/src/main/jniLibs/arm64-v8a/libclient.so
 
           cp ../app/src/main/jniLibs/arm64-v8a/libclient.so \
              ../build/go-client/libclient-arm64-v8a.so
@@ -197,11 +196,11 @@ jobs:
           GOARM=7 \
           CC="$TOOLCHAIN/armv7a-linux-androideabi${ANDROID_MIN_API}-clang" \
             go build \
-              -buildmode=c-shared \
               -trimpath \
-              -ldflags="-s -w -checklinkname=0" \
+              -ldflags="-checklinkname=0 -s -w" \
               -o ../app/src/main/jniLibs/armeabi-v7a/libclient.so \
               .
+          chmod +x ../app/src/main/jniLibs/armeabi-v7a/libclient.so
 
           cp ../app/src/main/jniLibs/armeabi-v7a/libclient.so \
              ../build/go-client/libclient-armeabi-v7a.so
@@ -212,11 +211,11 @@ jobs:
           GOARCH=amd64 \
           CC="$TOOLCHAIN/x86_64-linux-android${ANDROID_MIN_API}-clang" \
             go build \
-              -buildmode=c-shared \
               -trimpath \
-              -ldflags="-s -w -checklinkname=0" \
+              -ldflags="-checklinkname=0 -s -w" \
               -o ../app/src/main/jniLibs/x86_64/libclient.so \
               .
+          chmod +x ../app/src/main/jniLibs/x86_64/libclient.so
 
           cp ../app/src/main/jniLibs/x86_64/libclient.so \
              ../build/go-client/libclient-x86_64.so
@@ -225,6 +224,26 @@ jobs:
 
           echo "Built JNI libraries:"
           find app/src/main/jniLibs -type f -name "libclient.so" -exec ls -lh {} \;
+
+      - name: Verify Android runtime files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          required_files=(
+            "app/src/main/assets/${SERVER_BINARY_NAME}"
+            "app/src/main/jniLibs/arm64-v8a/libclient.so"
+            "app/src/main/jniLibs/armeabi-v7a/libclient.so"
+            "app/src/main/jniLibs/x86_64/libclient.so"
+          )
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "::error::Missing Android runtime file: $file"
+              exit 1
+            fi
+            ls -lh "$file"
+          done
 
       - name: Make Gradle wrapper executable
         shell: bash
